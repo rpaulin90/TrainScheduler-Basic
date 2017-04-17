@@ -25,20 +25,6 @@
             <th class="text-center">Next Arrival</th>
             <th class="text-center">Minutes Away</th>
             </thead>
-            <tr>
-                <td>Trenton</td>
-                <td>Trenton</td>
-                <td>Trenton</td>
-                <td>Trenton</td>
-                <td>Trenton</td>
-            </tr>
-            <tr>
-                <td>Trenton</td>
-                <td>Trenton</td>
-                <td>Trenton</td>
-                <td>Trenton</td>
-                <td>Trenton</td>
-            </tr>
         </table>
     </div>
 
@@ -74,8 +60,24 @@
 
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/live/3.0/firebase.js"></script>
+<script src="https://cdn.jsdelivr.net/momentjs/2.12.0/moment.min.js"></script>
 <script src="https://code.jquery.com/jquery.js"></script>
 <script type="text/javascript">
+
+    var config = {
+        apiKey: "AIzaSyAJS4YQWU5DmESeYueG1qH1NGkjv3DncEY",
+        authDomain: "fir-click-counter-7cdb9.firebaseapp.com",
+        databaseURL: "https://train-scheduler-96318.firebaseio.com/",
+        storageBucket: "train-scheduler-96318"
+    };
+
+    firebase.initializeApp(config);
+
+    var database = firebase.database();
+
+    var trainRef = database.ref().child("train-scheduler-96318");
+
 
     var form = {
         name: function(){
@@ -90,16 +92,74 @@
             return $("#trainFrequency").val();
         },
 
-        nextArrival: function(){
+        firstTrain: function(){
             return $("#firstTrainTime").val(); //need another function
         },
 
         minutes: function(){
-            return $("#trainFrequency").val(); // need another function
+            return moment($("#firstTrainTime").val(),"HH:mm").diff(moment(),"minutes");
+        },
+
+        dateAdded: function(){
+            return firebase.database.ServerValue.TIMESTAMP
         }
     };
 
-    var makeNewEntry = function () {
+
+//    var makeNewEntry = function () {
+//        var new_row = $("<tr>");
+//        var new_name = $("<td>");
+//        var new_destination = $("<td>");
+//        var new_nextTrain = $("<td>");
+//        var new_frequency = $("<td>");
+//        var new_minAway = $("<td>");
+//
+//        new_name.text(form.name);
+//        new_destination.text(form.destination);
+//        new_nextTrain.text(form.nextArrival);
+//        new_frequency.text(form.frequency);
+//        new_minAway.text(form.minutes);
+//
+//        new_row.append(new_name);
+//        new_row.append(new_destination);
+//        new_row.append(new_frequency);
+//        new_row.append(new_nextTrain);
+//        new_row.append(new_minAway);
+//
+//        $("table").append(new_row);
+//
+//    };
+
+    $("#submitBtn").on("click",function(event){
+
+        event.preventDefault();
+
+//        makeNewEntry();
+        var first_train_time = function(){
+            return $("#firstTrainTime").val();
+        };
+
+
+        var difference = function(){
+            return moment(first_train_time(),"HH:mm").diff(moment(), "minutes");
+        };
+
+
+        database.ref().push({
+
+            nameinpt:form.name(),
+            destinationinpt: form.destination(),
+            frequencyinpt: form.frequency(),
+            first_train: form.firstTrain(),
+//            minAway: difference(),
+            date_added:form.dateAdded()
+
+        });
+
+    });
+
+    database.ref().on("child_added",function(snapshot){
+
         var new_row = $("<tr>");
         var new_name = $("<td>");
         var new_destination = $("<td>");
@@ -107,11 +167,48 @@
         var new_frequency = $("<td>");
         var new_minAway = $("<td>");
 
-        new_name.text(form.name);
-        new_destination.text(form.destination);
-        new_nextTrain.text(form.nextArrival);
-        new_frequency.text(form.frequency);
-        new_minAway.text(form.minutes);
+//        var new_difference = function(){
+//            return moment(snapshot.val().first_train,"HH:mm").diff(moment(), "minutes");
+//        };
+//
+//        database.ref().child(snapshot.key).update({
+//            minAway: new_difference()
+//       });
+//        console.log(snapshot.key);
+
+        //////////////////////////////////////////////////////////////
+
+        var tFrequency = snapshot.val().frequencyinpt;
+        // Time is 3:30 AM
+        var firstTime = snapshot.val().first_train;
+        // First Time (pushed back 1 year to make sure it comes before current time)
+        var firstTimeConverted = moment(firstTime, "hh:mm").subtract(1, "years");
+        console.log(firstTimeConverted);
+        // Current Time
+        var currentTime = moment();
+        console.log("CURRENT TIME: " + moment(currentTime).format("hh:mm"));
+        // Difference between the times
+        var diffTime = moment().diff(moment(firstTimeConverted), "minutes");
+        console.log("DIFFERENCE IN TIME: " + diffTime);
+        // Time apart (remainder)
+        var tRemainder = diffTime % tFrequency;
+        console.log(tRemainder);
+        // Minute Until Train
+        var tMinutesTillTrain = tFrequency - tRemainder;
+        console.log("MINUTES TILL TRAIN: " + tMinutesTillTrain);
+        // Next Train
+        var nextTrain = moment().add(tMinutesTillTrain, "minutes");
+        console.log("ARRIVAL TIME: " + moment(nextTrain).format("hh:mm"));
+
+        /////////////////////////////////////////////////////////////
+
+
+
+        new_name.text(snapshot.val().nameinpt);
+        new_destination.text(snapshot.val().destinationinpt);
+        new_nextTrain.text(moment(nextTrain).format("hh:mm a"));
+        new_frequency.text(snapshot.val().frequencyinpt);
+        new_minAway.text(tMinutesTillTrain);
 
         new_row.append(new_name);
         new_row.append(new_destination);
@@ -121,15 +218,21 @@
 
         $("table").append(new_row);
 
-    }
 
-    $("#submitBtn").on("click",function(event){
 
-        event.preventDefault();
 
-        makeNewEntry();
+    },function(errorObject){
+        console.log("Errors handled: " + errorObject.code);
+    });
 
-    })
+//    database.ref().orderByChild("date_added").limitToLast(1).on("child_added",function(snapshot){
+//
+//    },function(errorObject){
+//        console.log("Errors handled: " + errorObject.code);
+//    });
+
+
+
 
 
 </script>
